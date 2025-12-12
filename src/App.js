@@ -14,6 +14,7 @@ import AdminDashboard from './component/Admin/AdminDashboard';
 import CompanyRepLayout from './component/companyRep/CompanyRepLayout';
 import AIChat from './component/Students/dashboard/ChatQA/ChatPage.jsx';
 import OJTdocsAdmin from './component/AIchatbot/OJTdocsAdmin.jsx';
+import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
 function App() {
   return (
     <Router>
@@ -33,6 +34,7 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/company/*" element={<CompanyRepLayout />} />
         <Route path="/qa" element={<AIChat />} />
+        <Route path="/staff" element={<StaffsLayout />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

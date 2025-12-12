@@ -135,3 +135,13 @@
   .header-root { transition: none; }
   .lang-menu { animation: none; }
 }
+.semester-badge {
+  background: #e3f2ff;
+  border: 1px solid #90caf9;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0a3d62;
+  margin-right: 12px;
+}
