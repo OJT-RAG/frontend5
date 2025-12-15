@@ -7,7 +7,7 @@ import JobList from './component/profile/Joblist';
 import JobDetail from './component/profile/Jobdetail';
 import './component/login/Login.scss';
 import HomePage from './component/homepage/HomePage';
-import Dashboard from './component/Students/dashboard/Dashboard.jsx';
+import Student from './component/Students/dashboard/Dashboard.jsx';
 import OJT from './component/pages/pdf/OJT';
 import Header from './component/homepage/Header';
 import AdminDashboard from './component/Admin/AdminDashboard';
@@ -30,7 +30,7 @@ function App() {
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/ojt" element={<OJT />} />
         <Route path="/ragdocs" element={<OJTdocsAdmin />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/student" element={<Student />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/company/*" element={<CompanyRepLayout />} />
         <Route path="/qa" element={<AIChat />} />

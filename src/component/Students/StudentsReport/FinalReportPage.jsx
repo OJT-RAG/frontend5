@@ -44,39 +44,49 @@ const FinalReportPage = () => {
   };
 
   const onFinish = async (values) => {
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const formData = new FormData();
-
-      // Gửi field theo backend yêu cầu
-      formData.append("UserId", userId ?? "");
-      formData.append("JobPositionId", values.jobPositionId ?? "");
-      formData.append("SemesterId", values.semesterId ?? "");
-      formData.append("StudentReportText", values.studentReportText ?? "");
-
-      // Các field công ty gửi nullable
-      formData.append("CompanyFeedback", companyFeedback ?? "");
-      formData.append("CompanyRating", companyRating ?? "");
-      formData.append("CompanyEvaluator", companyEvaluator ?? "");
-
-      if (pdfFile) {
-        formData.append("File", pdfFile, pdfFile.name);
-      }
-
-      await finalReportApi.create(formData);
-
-      notification.success({ message: "Gửi báo cáo thành công!" });
-      handleRemove();
-    } catch (err) {
+  try {
+    if (!userId || !values.jobPositionId || !values.semesterId) {
       notification.error({
-        message: "Gửi thất bại",
-        description: err?.response?.data?.message || "Không thể gửi báo cáo",
+        message: "Thiếu thông tin bắt buộc",
       });
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    const formData = new FormData();
+
+    // ✅ CHỈ GỬI FIELD SINH VIÊN
+    formData.append("UserId", userId);
+    formData.append("JobPositionId", values.jobPositionId);
+    formData.append("SemesterId", values.semesterId);
+    formData.append(
+      "StudentReportText",
+      values.studentReportText ?? ""
+    );
+
+    // ✅ ĐÚNG KEY FILE
+    if (pdfFile) {
+      formData.append("StudentReportFile", pdfFile);
+    }
+
+    await finalReportApi.create(formData);
+
+    notification.success({ message: "Gửi báo cáo thành công!" });
+    handleRemove();
+  } catch (err) {
+    notification.error({
+      message: "Gửi thất bại",
+      description:
+        err?.response?.data?.message ||
+        err?.response?.data ||
+        "Không thể gửi báo cáo",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     // Set giá trị mặc định cho form

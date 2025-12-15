@@ -1,30 +1,73 @@
 import React, { useEffect, useState } from "react";
-import { Table, Input, Button, notification, InputNumber, Modal } from "antd";
+import {
+  Form,
+  Input,
+  Button,
+  Upload,
+  InputNumber,
+  Select,
+  notification,
+  Spin,
+} from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+
 import finalReportApi from "../../API/FinalReportAPI";
-import { Worker, Viewer } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
+import userApi from "../../API/UserAPI";
+import jobPositionApi from "../../API/JobPositionAPI";
+import semesterApi from "../../API/SemesterAPI";
 
-export default function CompanyFinalReportList() {
-  const [reports, setReports] = useState([]);
+const { Option } = Select;
+
+export default function CompanyCreateFinalReport() {
+  const [form] = Form.useForm();
+
   const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({});
+  const [pdfFile, setPdfFile] = useState(null);
 
-  // PDF Viewer
-  const [pdfUrl, setPdfUrl] = useState(null);
-  const [isPdfModalVisible, setIsPdfModalVisible] = useState(false);
-  const layoutPlugin = defaultLayoutPlugin();
+  const [students, setStudents] = useState([]);
+  const [jobPositions, setJobPositions] = useState([]);
+  const [activeSemester, setActiveSemester] = useState(null);
 
-  const fetchReports = async () => {
+  // ===================== LOAD DATA =====================
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await finalReportApi.getAll();
-      setReports(Array.isArray(res.data.data) ? res.data.data : []);
+      const [userRes, jobRes, semesterRes] = await Promise.all([
+        userApi.getAll(),
+        jobPositionApi.getAll(),
+        semesterApi.getAll(),
+      ]);
+
+      /* ================= STUDENT (roleId = 3) ================= */
+      const allUsers = userRes.data.data || [];
+      const studentOnly = allUsers.filter(
+        (u) => u.userId === 3
+      );
+      setStudents(studentOnly);
+
+      /* ================= JOB POSITION ================= */
+      setJobPositions(jobRes.data.data || []);
+
+      /* ================= ACTIVE SEMESTER ================= */
+      const semesters = semesterRes.data.data || [];
+      const active = semesters.find((s) => s.isActive === true);
+
+      if (!active) {
+        notification.error({
+          message: "Không có học kỳ đang hoạt động",
+        });
+        return;
+      }
+
+      setActiveSemester(active);
+
+      // set semester name để hiển thị
+      form.setFieldsValue({
+        semesterName: active.name,
+      });
     } catch (err) {
       notification.error({
-        message: "Không thể tải dữ liệu",
+        message: "Lỗi tải dữ liệu",
         description: err.message,
       });
     } finally {
@@ -33,205 +76,158 @@ export default function CompanyFinalReportList() {
   };
 
   useEffect(() => {
-    fetchReports();
+    fetchData();
   }, []);
 
-  const handleEdit = (record) => {
-    setEditingId(record.finalreportId);
-    setFormData({
-      companyRating: record.companyRating ?? "",
-      companyFeedback: record.companyFeedback ?? "",
-      companyEvaluator: record.companyEvaluator ?? "",
-    });
+  // ===================== UPLOAD =====================
+  const handleUpload = (file) => {
+    setPdfFile(file);
+    return false;
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setFormData({});
-  };
-
-  const handleSave = async (record) => {
-    const data = new FormData();
-    data.append("FinalreportId", record.finalreportId);
-    data.append("UserId", record.userId);
-    data.append("JobPositionId", record.jobPositionId);
-    data.append("SemesterId", record.semesterId);
-    data.append("StudentReportText", record.studentReportText ?? "");
-    data.append("CompanyFeedback", formData.companyFeedback ?? "");
-    data.append("CompanyRating", formData.companyRating ?? "");
-    data.append("CompanyEvaluator", formData.companyEvaluator ?? "");
-
+  // ===================== SUBMIT =====================
+  const onFinish = async (values) => {
     try {
-      await finalReportApi.update(data);
-      notification.success({ message: "Cập nhật thành công" });
-      setEditingId(null);
-      fetchReports();
+      if (!activeSemester) {
+        notification.error({ message: "Chưa có học kỳ active" });
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("UserId", values.userId);
+      formData.append("JobPositionId", values.jobPositionId);
+      formData.append("SemesterId", activeSemester.semesterId); // 🔥 gửi ID
+      formData.append("CompanyFeedback", values.companyFeedback);
+      formData.append("CompanyRating", values.companyRating);
+      formData.append("CompanyEvaluator", values.companyEvaluator);
+
+      if (pdfFile) {
+        formData.append("File", pdfFile);
+      }
+
+      await finalReportApi.create(formData);
+
+      notification.success({
+        message: "Company chấm điểm thành công",
+      });
+
+      form.resetFields();
+      setPdfFile(null);
+
+      form.setFieldsValue({
+        semesterName: activeSemester.name,
+      });
     } catch (err) {
       notification.error({
-        message: "Cập nhật thất bại",
-        description: err.message,
+        message: "Chấm điểm thất bại",
+        description:
+          err?.response?.data?.message ||
+          err?.response?.data ||
+          "Lỗi không xác định",
       });
     }
   };
 
-  const openPdfModal = (fileUrl) => {
-    setPdfUrl(fileUrl);
-    setIsPdfModalVisible(true);
-  };
+  // ===================== RENDER =====================
+  return (
+    <Spin spinning={loading}>
+      <div style={{ padding: 24, maxWidth: 700 }}>
+        <h2>Company chấm điểm sinh viên</h2>
 
-  const closePdfModal = () => {
-    setPdfUrl(null);
-    setIsPdfModalVisible(false);
-  };
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={onFinish}
+        >
+          {/* ===== STUDENT (roleId = 3) ===== */}
+          <Form.Item
+            label="Sinh viên"
+            name="userId"
+            rules={[{ required: true, message: "Chọn sinh viên" }]}
+          >
+            <Select placeholder="Chọn sinh viên">
+              {students.map((u) => (
+                <Option key={u.userId} value={u.userId}>
+                  {u.fullname}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
 
-  const columns = [
-    {
-      title: "FinalReport ID",
-      dataIndex: "finalreportId",
-      key: "finalreportId",
-      sorter: (a, b) => a.finalreportId - b.finalreportId,
-    },
-    {
-      title: "User ID",
-      dataIndex: "userId",
-      key: "userId",
-      sorter: (a, b) => a.userId - b.userId,
-    },
-    {
-      title: "Job Position ID",
-      dataIndex: "jobPositionId",
-      key: "jobPositionId",
-      sorter: (a, b) => a.jobPositionId - b.jobPositionId,
-    },
-    {
-      title: "Semester ID",
-      dataIndex: "semesterId",
-      key: "semesterId",
-    },
-    {
-      title: "Student Report",
-      dataIndex: "studentReportFile",
-      key: "studentReportFile",
-      render: (file) =>
-        file ? (
-          <>
-            
-            <a href={file} download>
-              Tải xuống
-            </a>
-          </>
-        ) : (
-          "Chưa có file"
-        ),
-    },
-    {
-      title: "Student Text",
-      dataIndex: "studentReportText",
-      key: "studentReportText",
-      render: (text) => text || "-",
-    },
+          {/* ===== JOB POSITION ===== */}
+          <Form.Item
+            label="Vị trí thực tập"
+            name="jobPositionId"
+            rules={[{ required: true, message: "Chọn vị trí" }]}
+          >
+            <Select placeholder="Chọn vị trí thực tập">
+              {jobPositions.map((jp) => (
+                <Option
+                  key={jp.jobPositionId}
+                  value={jp.jobPositionId}
+                >
+                  {jp.jobTitle}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
 
-    {
-      title: "Company Rating",
-      dataIndex: "companyRating",
-      key: "companyRating",
-      render: (text, record) =>
-        editingId === record.finalreportId ? (
-          <InputNumber
-            min={0}
-            max={5}
-            value={formData.companyRating}
-            onChange={(v) => setFormData({ ...formData, companyRating: v })}
-          />
-        ) : (
-          text ?? "-"
-        ),
-    },
+          {/* ===== SEMESTER NAME (READ ONLY) ===== */}
+          <Form.Item label="Học kỳ" name="semesterName">
+            <Input disabled />
+          </Form.Item>
 
-    {
-      title: "Company Feedback",
-      dataIndex: "companyFeedback",
-      key: "companyFeedback",
-      render: (text, record) =>
-        editingId === record.finalreportId ? (
-          <Input.TextArea
-            rows={2}
-            value={formData.companyFeedback}
-            onChange={(e) =>
-              setFormData({ ...formData, companyFeedback: e.target.value })
-            }
-          />
-        ) : (
-          text ?? "-"
-        ),
-    },
+          {/* ===== COMPANY FEEDBACK ===== */}
+          <Form.Item
+            label="Nhận xét của công ty"
+            name="companyFeedback"
+            rules={[{ required: true, message: "Nhập nhận xét" }]}
+          >
+            <Input.TextArea rows={4} />
+          </Form.Item>
 
-    {
-      title: "Company Evaluator",
-      dataIndex: "companyEvaluator",
-      key: "companyEvaluator",
-      render: (text, record) =>
-        editingId === record.finalreportId ? (
-          <Input
-            value={formData.companyEvaluator}
-            onChange={(e) =>
-              setFormData({ ...formData, companyEvaluator: e.target.value })
-            }
-          />
-        ) : (
-          text ?? "-"
-        ),
-    },
+          {/* ===== COMPANY RATING ===== */}
+          <Form.Item
+            label="Điểm đánh giá"
+            name="companyRating"
+            rules={[{ required: true, message: "Nhập điểm" }]}
+          >
+            <InputNumber
+              min={0}
+              max={10}
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
 
-    {
-      title: "Action",
-      key: "action",
-      render: (_, record) =>
-        editingId === record.finalreportId ? (
-          <>
-            <Button type="link" onClick={() => handleSave(record)}>
-              Lưu
-            </Button>
-            <Button type="link" onClick={handleCancel}>
-              Hủy
-            </Button>
-          </>
-        ) : (
-          <Button type="link" onClick={() => handleEdit(record)}>
+          {/* ===== EVALUATOR ===== */}
+          <Form.Item
+            label="Người đánh giá"
+            name="companyEvaluator"
+            rules={[
+              { required: true, message: "Nhập tên người đánh giá" },
+            ]}
+          >
+            <Input />
+          </Form.Item>
+
+          {/* ===== FILE ===== */}
+          <Form.Item label="File đính kèm (PDF)">
+            <Upload
+              beforeUpload={handleUpload}
+              maxCount={1}
+              accept=".pdf"
+            >
+              <Button icon={<UploadOutlined />}>
+                Chọn file PDF
+              </Button>
+            </Upload>
+          </Form.Item>
+
+          <Button type="primary" htmlType="submit">
             Chấm điểm
           </Button>
-        ),
-    },
-  ];
-
-  return (
-    <div style={{ padding: 20 }}>
-      <h2>Danh sách Final Report</h2>
-
-      <Table
-        dataSource={reports}
-        columns={columns}
-        rowKey="finalreportId"
-        loading={loading}
-        pagination={{ pageSize: 10 }}
-      />
-
-      {/* PDF Preview Modal */}
-      <Modal
-        open={isPdfModalVisible}
-        title="Xem báo cáo sinh viên"
-        onCancel={closePdfModal}
-        footer={null}
-        width="80%"
-        style={{ top: 20 }}
-        bodyStyle={{ height: "80vh" }}
-      >
-        {pdfUrl && (
-          <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
-            <Viewer fileUrl={pdfUrl} plugins={[layoutPlugin]} />
-          </Worker>
-        )}
-      </Modal>
-    </div>
+        </Form>
+      </div>
+    </Spin>
   );
 }

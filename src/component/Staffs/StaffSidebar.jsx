@@ -10,6 +10,7 @@ const StaffSidebar = ({ activeModule, setActiveModule }) => {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "semester", label: "Semester", icon: <CalendarRange size={20} /> },
+    { id: "final", label: "Final Report", icon: <CalendarRange size={20} /> },
   ];
 
   return (
