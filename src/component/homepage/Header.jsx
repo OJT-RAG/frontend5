@@ -76,8 +76,8 @@ const Header = () => {
             <BookOpen /> <span>{t("nav_ojt_docs")}</span>
             <span className="line"></span>
           </Link>
-          <Link to='/dashboard' className={`nav-btn ${isActive('/dashboard') ? 'active' : ''}`}>
-            <User /> <span>{t("nav_dashboard")}</span>
+          <Link to='/student' className={`nav-btn ${isActive('/student') ? 'active' : ''}`}>
+            <User /> <span>{t("Student")}</span>
             <span className="line"></span>
           </Link>
           <Link to='/admin' className={`nav-btn ${isActive('/admin') ? 'active' : ''}`}>

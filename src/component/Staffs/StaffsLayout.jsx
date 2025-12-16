@@ -3,7 +3,8 @@ import { Layout } from "antd";
 import StaffSidebar from "./StaffSidebar.jsx";
 import StaffDashboard from "./Dashboard/StaffDashboard.jsx";
 import SemesterManagement from "./Semester/SemesterManagement.jsx";
-
+import StaffFinalResultPage from "./Final/StaffFinalResultPage.jsx";
+import ChatPage from "./Chat/ChatPage.jsx";
 const { Sider, Content } = Layout;
 
 const StaffsLayout = () => {
@@ -24,6 +25,8 @@ const StaffsLayout = () => {
       <div style={{ flex: 1, padding: "20px" }}>
         {activeModule === "dashboard" && <StaffDashboard />}
         {activeModule === "semester" && <SemesterManagement />}
+        {activeModule === "final" && <StaffFinalResultPage />}
+        {activeModule === "chat" && <ChatPage />}
       </div>
 
     </Layout>

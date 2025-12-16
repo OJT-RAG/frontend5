@@ -15,152 +15,121 @@ function Login() {
     const navigate = useNavigate();
     const { t } = useI18n();
 
-    // -------------------- LOGIN API --------------------
+    // ================= LOAD CONFIG =================
+    useEffect(() => {
+        fetch('/app-config.json', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(setAppConfig)
+            .catch(() => {});
+    }, []);
+
+    // ================= GOOGLE CALLBACK (QUERY STRING) =================
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+
+        const token = params.get('token');
+        const role = params.get('role');
+        const fullname = params.get('fullname');
+        const emailFromGoogle = params.get('email');
+
+        // 👉 chỉ chạy khi backend redirect về có token
+        if (!token) return;
+
+        const authUser = {
+            fullname: fullname || 'Google User',
+            email: emailFromGoogle,
+            role: role || 'student'
+        };
+
+        localStorage.setItem('token', token);
+        localStorage.setItem('authUser', JSON.stringify(authUser));
+        localStorage.setItem('userRole', authUser.role);
+
+        setNotice('🎉 Đăng nhập Google thành công');
+        navigate('/', { replace: true });
+    }, [navigate]);
+
+    // ================= LOGIN API =================
     const loginApi = async (email, password) => {
         try {
-            const response = await userApi.login({ email, password });
+            const res = await userApi.login({ email, password });
 
-            if (response?.data?.data) {
+            if (res?.data?.data) {
                 return {
                     success: true,
-                    message: response.data.message,
-                    user: response.data.data
+                    user: res.data.data
                 };
             }
 
-            return { success: false, message: "Login failed: no user data." };
-
+            return { success: false, message: 'Login failed' };
         } catch (err) {
             return {
                 success: false,
-                message: err?.response?.data?.message || "Login failed."
+                message: err?.response?.data?.message || 'Login failed'
             };
         }
     };
 
-    // -------------------- HANDLE FORM SUBMIT --------------------
+    // ================= SUBMIT EMAIL LOGIN =================
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        setNotice('');
         setLoading(true);
 
         const result = await loginApi(email, password);
-
         setLoading(false);
 
-        if (result.success) {
-
-            // ---------------------- LƯU USER ----------------------
-            const user = {
-                fullname: result.user.fullname,
-                email: result.user.email,
-                role: result.user.role || "students"
-            };
-
-            localStorage.setItem("authUser", JSON.stringify(user));
-
-            // ---------------------- CHÀO MỪNG ----------------------
-            setNotice(`🎉 Chào mừng, ${user.fullname}!`);
-
-            // Redirect để user kịp nhìn thông báo
-            setTimeout(() => navigate('/'), 1200);
-
-        } else {
+        if (!result.success) {
             setError(result.message);
-        }
-    };
-
-    // -------------------- LOAD APP CONFIG --------------------
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadConfig() {
-            try {
-                const res = await fetch('/app-config.json', { cache: 'no-store' });
-                if (!res.ok) return;
-                const json = await res.json();
-                if (!cancelled) setAppConfig(json || {});
-            } catch {}
-        }
-
-        loadConfig();
-        return () => { cancelled = true; };
-    }, []);
-
-    // -------------------- PARSE GOOGLE OAUTH CALLBACK --------------------
-    useEffect(() => {
-        const hash = window.location.hash || '';
-        const idx = hash.indexOf('?');
-        if (idx === -1) return;
-
-        const params = new URLSearchParams(hash.substring(idx + 1));
-
-        if (params.get('oauth') === 'google') {
-            const status = params.get('status');
-            const msg = params.get('message');
-
-            if (status === "success") {
-                // Lưu user google tạm thời
-                localStorage.setItem("authUser", JSON.stringify({
-                    fullname: "Google User",
-                    role: "students"
-                }));
-
-                setNotice(t("login_google_success"));
-            } else {
-                const m = msg ? decodeURIComponent(msg) : t("login_google_failed");
-                setError(m);
-                console.error("Google login error:", m);
-            }
-
-            navigate("/login", { replace: true });
-        }
-    }, []); // ⛔ không warning vì navigate & t không cần thiết trong deps
-
-    // -------------------- GOOGLE LOGIN --------------------
-    const handleGoogleLogin = () => {
-        const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || appConfig?.googleClientId || '';
-        const redirectUri = process.env.REACT_APP_GOOGLE_REDIRECT_URI || appConfig?.googleRedirectUri || 'https://localhost:7031/auth/google/callback';
-
-        if (!clientId) {
-            const msg = 'Missing Google Client ID.';
-            setError(msg);
             return;
         }
 
-        const scope = encodeURIComponent('openid email profile');
-        const state = encodeURIComponent(Math.random().toString(36).slice(2));
+        const apiRole = result.user.role;
+
+        const authUser = {
+            id: result.user.userId,
+            fullname: result.user.fullname,
+            email: result.user.email,
+            role: apiRole
+        };
+
+        localStorage.setItem('authUser', JSON.stringify(authUser));
+        localStorage.setItem('userRole', apiRole);
+
+        setNotice(`🎉 Chào mừng, ${authUser.fullname}`);
+        setTimeout(() => navigate('/'), 1000);
+    };
+
+    // ================= GOOGLE LOGIN =================
+    const handleGoogleLogin = () => {
+        const clientId =
+            process.env.REACT_APP_GOOGLE_CLIENT_ID ||
+            appConfig?.googleClientId;
+
+        if (!clientId) {
+            setError('Missing Google Client ID');
+            return;
+        }
+
+        // ⚠️ Redirect URI PHẢI LÀ BACKEND
+        const redirectUri = 'https://localhost:7031/auth/google/callback';
 
         const params = [
             `client_id=${encodeURIComponent(clientId)}`,
             `redirect_uri=${encodeURIComponent(redirectUri)}`,
             `response_type=code`,
-            `scope=${scope}`,
+            `scope=openid email profile`,
             `access_type=offline`,
-            `include_granted_scopes=true`,
-            `prompt=consent`,
-            `state=${state}`
+            `prompt=consent`
         ].join('&');
 
-        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+        window.location.href =
+            `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
     };
 
-    // -------------------- HANDLE CLICK LOGO --------------------
-    const handleLogoHome = () => navigate('/');
-
-    // -------------------- UI --------------------
+    // ================= UI =================
     return (
         <div className="login-container">
-            <div
-                className="fpt-uni-logo"
-                role="button"
-                tabIndex={0}
-                onClick={handleLogoHome}
-            >
-                FPT UNIVERSITY
-            </div>
-
             <form className="login-form" onSubmit={handleSubmit}>
                 <div className="login-logo">FPT</div>
                 <h2>{t('login_title')}</h2>
@@ -181,29 +150,22 @@ function Login() {
                     required
                 />
 
-                <div className="helper-text">{t('password_helper')}</div>
-
                 <button type="submit" disabled={loading}>
-                    {loading ? <span className="spinner"></span> : t('login')}
+                    {loading ? 'Loading...' : t('login')}
                 </button>
 
                 <div className="social-login">
-                    <button type="button" className="google-btn" onClick={handleGoogleLogin}>
+                    <button
+                        type="button"
+                        className="google-btn"
+                        onClick={handleGoogleLogin}
+                    >
                         {t('login_with_google')}
                     </button>
                 </div>
 
                 {error && <div className="error">{error}</div>}
                 {notice && <div className="success">{notice}</div>}
-
-                <div className="secondary-actions">
-                    <button type="button" className="link-btn" onClick={() => navigate('/forgot')}>
-                        {t('forgot_password')}
-                    </button>
-                    <button type="button" className="link-btn" onClick={() => navigate('/signup')}>
-                        {t('create_account')}
-                    </button>
-                </div>
             </form>
         </div>
     );
