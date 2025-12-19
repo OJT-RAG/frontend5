@@ -8,14 +8,30 @@ const UpdateUserPage = ({ userId = 0 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
+  const resolvedUserId = React.useMemo(() => {
+    if (userId && Number(userId) > 0) return Number(userId);
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}") || {};
+      return Number(authUser.id) || 0;
+    } catch {
+      return 0;
+    }
+  }, [userId]);
+
   // Fetch dữ liệu user khi component mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const data = await userApi.getById(userId);
+        if (!resolvedUserId) {
+          message.warning("Missing userId. Please login first.");
+          return;
+        }
+
+        const res = await userApi.getById(resolvedUserId);
+        const data = res?.data?.data ?? res?.data ?? {};
         form.setFieldsValue({
           ...data,
-          dob: data.dob ? moment(data.dob) : null,
+          dob: data?.dob ? moment(data.dob) : null,
         });
       } catch (error) {
         console.error(error);
@@ -24,7 +40,7 @@ const UpdateUserPage = ({ userId = 0 }) => {
     };
 
     fetchUser();
-  }, [userId, form]);
+  }, [resolvedUserId, form]);
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -51,7 +67,7 @@ const UpdateUserPage = ({ userId = 0 }) => {
     form={form}
     layout="vertical"
     onFinish={onFinish}
-    initialValues={{ userId, majorId: 0, companyId: 0 }}
+    initialValues={{ userId: resolvedUserId, majorId: 0, companyId: 0 }}
   >
         <Form.Item name="userId" hidden>
           <Input />

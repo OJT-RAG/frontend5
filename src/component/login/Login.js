@@ -162,6 +162,14 @@ function Login() {
                     >
                         {t('login_with_google')}
                     </button>
+
+                    <button
+                        type="button"
+                        className="google-btn"
+                        onClick={() => navigate('/signup')}
+                    >
+                        {t('create_account')}
+                    </button>
                 </div>
 
                 {error && <div className="error">{error}</div>}

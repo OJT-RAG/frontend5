@@ -127,30 +127,46 @@ function SignUp() {
     setSubmitting(true);
     try {
       const payload = {
-        MajorId: form.majorId ? Number(form.majorId) : null,
-        CompanyId: form.companyId ? Number(form.companyId) : null,
-        Email: form.email || null,
-        Password: form.password || null,
-        Fullname: form.fullname || null,
-        StudentCode: form.studentCode || null,
-        Dob: form.dob || null, // expects YYYY-MM-DD
-        Phone: form.phone || null,
-        AvatarUrl: form.avatarUrl || null,
-        CvUrl: form.cvUrl || null,
+        majorId: form.majorId ? Number(form.majorId) : 0,
+        companyId: form.companyId ? Number(form.companyId) : 0,
+        // Backend DB requires role NOT NULL; default new accounts to student.
+        // (DTO binding is case-insensitive; include roleId as a fallback if backend uses numeric roles.)
+        role: 'student',
+        roleId: 3,
+        email: form.email || '',
+        password: form.password || '',
+        fullname: form.fullname || '',
+        studentCode: form.studentCode || '',
+        dob: form.dob || null, // expects YYYY-MM-DD
+        phone: form.phone || '',
+        avatarUrl: form.avatarUrl || '',
+        cvUrl: form.cvUrl || '',
       };
 
-      const base = process.env.REACT_APP_API_BASE_URL || '';
+      const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5220').replace(/\/$/, '');
       const endpoint = process.env.REACT_APP_SIGNUP_ENDPOINT || '/api/user/create';
-      const url = `${base}`.replace(/\/$/, '') + `${endpoint}`;
+      const url = `${base}${endpoint}`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json().catch(() => null);
+      const rawText = await res.text().catch(() => '');
+      let json = null;
+      try {
+        json = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        json = null;
+      }
+
       if (!res.ok) {
-        const msg = json && json.message ? json.message : `${t('signup_submit_error')} (HTTP ${res.status})`;
+        const serverMsg =
+          (json && (json.message || json.title || json.error)) ||
+          (typeof rawText === 'string' && rawText.trim() ? rawText.trim() : null);
+        const msg = serverMsg || `${t('signup_submit_error')} (HTTP ${res.status})`;
+        // eslint-disable-next-line no-console
+        console.error('Signup failed response:', { status: res.status, url, payload: { ...payload, password: '***' }, rawText });
         throw new Error(msg);
       }
 

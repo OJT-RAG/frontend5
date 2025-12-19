@@ -3,22 +3,86 @@ import { useNavigate } from 'react-router-dom';
 import './CV.scss';
 import fptBadge from '../assets/fpt.png';
 import { useI18n } from '../../i18n/i18n.jsx';
+import userApi from '../API/UserAPI.js';
 
 function CV({ student }) {
   const navigate = useNavigate();
   const { t } = useI18n();
   // Remove internal panel state; CV now only shows profile info.
 
-  const data = student || {
-    name: 'Nguyen Van A',
-    major: 'Software Engineering',
-    studentNumber: 'SE123456',
-    dob: '2003-05-20',
-    currentSemester: 'Fall 2025',
-    joinSemester: 'Fall 2021',
-    expectedGraduate: 'Spring 2026',
-    avatarUrl: null,
-  };
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      if (student) {
+        setProfile(student);
+        return;
+      }
+
+      let authUser = null;
+      try {
+        authUser = JSON.parse(localStorage.getItem('authUser') || 'null');
+      } catch {
+        authUser = null;
+      }
+
+      const userId = Number(authUser?.id) || 0;
+      if (!userId) {
+        setProfile(null);
+        return;
+      }
+
+      try {
+        const res = await userApi.getById(userId);
+        const u = res?.data?.data ?? res?.data ?? null;
+        if (cancelled) return;
+        setProfile(u);
+      } catch {
+        if (cancelled) return;
+        setProfile(null);
+      }
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [student]);
+
+  const data = useMemo(() => {
+    // If parent passes legacy shape (already in CV format), accept it.
+    if (profile && (profile.name || profile.studentNumber)) {
+      return {
+        name: profile.name || '-',
+        major: profile.major || '-',
+        studentNumber: profile.studentNumber || '-',
+        dob: profile.dob || '-',
+        currentSemester: profile.currentSemester || '-',
+        joinSemester: profile.joinSemester || '-',
+        expectedGraduate: profile.expectedGraduate || '-',
+        avatarUrl: profile.avatarUrl || null,
+      };
+    }
+
+    // Map API user shape -> CV view model.
+    const majorText =
+      profile?.majorTitle ||
+      profile?.majorName ||
+      (profile?.majorId != null ? String(profile.majorId) : '-');
+
+    return {
+      name: profile?.fullname || '-',
+      major: majorText,
+      studentNumber: profile?.studentCode || '-',
+      dob: profile?.dob || '-',
+      currentSemester: profile?.currentSemester || '-',
+      joinSemester: profile?.joinSemester || '-',
+      expectedGraduate: profile?.expectedGraduate || '-',
+      avatarUrl: profile?.avatarUrl || null,
+    };
+  }, [profile]);
 
   const getInitials = (fullName) => {
     if (!fullName) return '';
@@ -147,7 +211,7 @@ function CV({ student }) {
           <h1>{t('cv_title')}</h1>
           <div className="cv-actions">
             <button type="button" className="btn secondary" onClick={() => navigate('/')}>{t('home')}</button>
-            <button type="button" className="btn primary">{t('edit_profile')}</button>
+            <button type="button" className="btn primary" onClick={() => navigate('/profile/update')}>{t('edit_profile')}</button>
             <button
               type="button"
               className={`btn apps-toggle ${showApps ? 'on' : ''}`}

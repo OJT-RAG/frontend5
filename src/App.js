@@ -5,6 +5,7 @@ import ForgotPassword from './component/forgotpassword/ForgotPassword';
 import CV from './component/profile/CV';
 import JobList from './component/profile/Joblist';
 import JobDetail from './component/profile/Jobdetail';
+import UpdateUserPage from './component/Students/userProfile/UpdateUserPage.jsx';
 import './component/login/Login.scss';
 import HomePage from './component/homepage/HomePage';
 import Student from './component/Students/dashboard/Dashboard.jsx';
@@ -26,6 +27,7 @@ function App() {
         <Route path="/forgot" element={<ForgotPassword />} />
         <Route path="/homepage" element={<HomePage />} />
         <Route path="/profile/cv" element={<CV />} />
+        <Route path="/profile/update" element={<UpdateUserPage />} />
         <Route path="/jobs" element={<JobList />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/ojt" element={<OJT />} />
