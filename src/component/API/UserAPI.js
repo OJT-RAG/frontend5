@@ -3,6 +3,9 @@ import httpClient from "./httpClient";
 const userApi = {
   login: (data) => httpClient.post("/user/login", data),
 
+  // Swagger: POST /api/auth/google-login
+  googleLogin: (data) => httpClient.post("/auth/google-login", data),
+
   getAll: () => httpClient.get("/user/getAll"),
 
   // Backend spec: GET /api/user/get/{id}
